@@ -89,9 +89,9 @@ func buildRuntime(cfg config, now func() time.Time) (*runtime, error) {
 		}
 	}
 	probeLifecycle := probe.NewLifecycle(probeRegistry, now)
-	snapshots := telemetry.NewSnapshotStore()
-	snapshots.Replace(vesselRegistry.List(), now())
-	ingestor := telemetry.NewIngestor(probeRegistry, vesselState, snapshots)
+	broker := telemetry.NewVesselBroker(telemetry.VesselBrokerConfig{})
+	broker.Replace(vesselRegistry.List(), now())
+	ingestor := telemetry.NewIngestor(probeRegistry, vesselState, broker)
 	subscriptions := telemetry.NewSubscriptionManager(probeRegistry, ingestor)
 	for _, item := range probeRegistry.List() {
 		if err := subscriptions.Start(item.ID); err != nil {

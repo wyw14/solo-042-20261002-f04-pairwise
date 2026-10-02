@@ -21,7 +21,7 @@ func TestIngestRejectsObsoleteBindingGeneration(t *testing.T) {
 	if err := probes.Register(probeState); err != nil {
 		t.Fatal(err)
 	}
-	ingestor := NewIngestor(probes, vessel.NewStateService(vessels, now), NewSnapshotStore())
+	ingestor := NewIngestor(probes, vessel.NewStateService(vessels, now), NewVesselBroker(VesselBrokerConfig{}))
 	stale := probeState.NewSample(50, now())
 	if _, err := probe.NewLifecycle(probes, now).Rebind("P-01", "V-02"); err != nil {
 		t.Fatal(err)

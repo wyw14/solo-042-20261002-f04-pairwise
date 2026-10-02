@@ -13,7 +13,7 @@ import (
 type Ingestor struct {
 	probes    *probe.Registry
 	vessels   *vessel.StateService
-	snapshots *SnapshotStore
+	broker    *VesselBroker
 	mu        sync.RWMutex
 	accepted  uint64
 	dropped   uint64
@@ -30,8 +30,11 @@ func (i *Ingestor) AddObserver(observer func(model.Sample)) error {
 	return nil
 }
 
-func NewIngestor(probes *probe.Registry, vessels *vessel.StateService, snapshots *SnapshotStore) *Ingestor {
-	return &Ingestor{probes: probes, vessels: vessels, snapshots: snapshots}
+func NewIngestor(probes *probe.Registry, vessels *vessel.StateService, broker *VesselBroker) *Ingestor {
+	if broker == nil {
+		broker = NewVesselBroker(VesselBrokerConfig{})
+	}
+	return &Ingestor{probes: probes, vessels: vessels, broker: broker}
 }
 
 func (i *Ingestor) Ingest(sample model.Sample) error {
@@ -64,7 +67,7 @@ func (i *Ingestor) Ingest(sample model.Sample) error {
 	if err != nil {
 		return err
 	}
-	i.snapshots.Apply(updated)
+	i.broker.Publish(updated)
 	i.mu.Lock()
 	i.accepted++
 	observers := append([]func(model.Sample){}, i.observers...)
@@ -82,9 +85,20 @@ func (i *Ingestor) Stats() (accepted, dropped uint64) {
 }
 
 func (i *Ingestor) Snapshot() Snapshot {
-	return i.snapshots.StableSnapshot()
+	return i.broker.StableSnapshot()
 }
 
 func (i *Ingestor) LastUpdated() time.Time {
-	return i.snapshots.StableSnapshot().UpdatedAt
+	return i.broker.LastUpdated()
+}
+
+// OpenStream 订阅罐体增量流并取得当前一致快照（含基线序号）。
+func (i *Ingestor) OpenStream() (*VesselSubscription, Snapshot, error) {
+	return i.broker.Open()
+}
+
+// ResumeStream 从游标 after 处恢复订阅，返回需要补投的历史变更。
+// 游标过期时返回 ErrCursorExpired，调用方应改走 OpenStream 重新取快照。
+func (i *Ingestor) ResumeStream(after uint64) (*VesselSubscription, []VesselEvent, error) {
+	return i.broker.Resume(after)
 }

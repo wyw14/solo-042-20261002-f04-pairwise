@@ -26,19 +26,25 @@ type Dependencies struct {
 	Health         *monitor.HealthService
 	ProbeMonitor   *monitor.ProbeMonitor
 	Suppressions   *alarm.SuppressionService
-	Now            func() time.Time
+	// StreamHeartbeat 是罐体流空闲心跳间隔；零值使用默认 15s。
+	StreamHeartbeat time.Duration
+	Now             func() time.Time
 }
 
 type Server struct {
-	deps   Dependencies
-	router chi.Router
+	deps            Dependencies
+	streamHeartbeat time.Duration
+	router          chi.Router
 }
 
 func NewServer(deps Dependencies) *Server {
 	if deps.Now == nil {
 		deps.Now = time.Now
 	}
-	server := &Server{deps: deps}
+	if deps.StreamHeartbeat <= 0 {
+		deps.StreamHeartbeat = streamHeartbeatInterval
+	}
+	server := &Server{deps: deps, streamHeartbeat: deps.StreamHeartbeat}
 	server.router = server.routes()
 	return server
 }
