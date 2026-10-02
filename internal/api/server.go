@@ -27,6 +27,9 @@ type Dependencies struct {
 	ProbeMonitor   *monitor.ProbeMonitor
 	Suppressions   *alarm.SuppressionService
 	Now            func() time.Time
+	// StreamHeartbeat is the interval between heartbeat events on the vessel
+	// stream. Defaults to 15 seconds.
+	StreamHeartbeat time.Duration
 }
 
 type Server struct {

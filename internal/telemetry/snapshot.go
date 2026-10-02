@@ -14,13 +14,17 @@ type Snapshot struct {
 }
 
 type SnapshotStore struct {
-	mu      sync.RWMutex
-	vessels map[string]model.Vessel
-	updated time.Time
+	mu             sync.RWMutex
+	vessels        map[string]model.Vessel
+	updated        time.Time
+	seq            uint64
+	journal        []Change
+	subscribers    map[uint64]*streamSubscriber
+	nextSubscriber uint64
 }
 
 func NewSnapshotStore() *SnapshotStore {
-	return &SnapshotStore{vessels: make(map[string]model.Vessel)}
+	return &SnapshotStore{vessels: make(map[string]model.Vessel), subscribers: make(map[uint64]*streamSubscriber)}
 }
 
 func (s *SnapshotStore) Apply(vessel model.Vessel) {
@@ -28,6 +32,7 @@ func (s *SnapshotStore) Apply(vessel model.Vessel) {
 	defer s.mu.Unlock()
 	s.vessels[vessel.ID] = vessel
 	s.updated = vessel.UpdatedAt
+	s.publish(vessel)
 }
 
 func (s *SnapshotStore) Get(id string) (model.Vessel, bool) {
@@ -65,4 +70,12 @@ func (s *SnapshotStore) Replace(vessels []model.Vessel, now time.Time) {
 		s.vessels[vessel.ID] = vessel
 	}
 	s.updated = now.UTC()
+	// A wholesale replace cannot be expressed as deltas: invalidate retained
+	// history so older cursors expire, and push live subscribers to resync.
+	s.seq++
+	s.journal = nil
+	for id, sub := range s.subscribers {
+		close(sub.lagged)
+		delete(s.subscribers, id)
+	}
 }

@@ -85,6 +85,18 @@ func (i *Ingestor) Snapshot() Snapshot {
 	return i.snapshots.StableSnapshot()
 }
 
+// SnapshotCursor returns a consistent snapshot and the cursor to resume from.
+func (i *Ingestor) SnapshotCursor() (Snapshot, uint64) {
+	return i.snapshots.SnapshotCursor()
+}
+
+// Subscribe resumes the change stream after the given cursor. ok is false
+// when the cursor expired from the retained journal; the client must fetch a
+// fresh snapshot.
+func (i *Ingestor) Subscribe(afterSeq uint64) ([]Change, *StreamSubscription, bool) {
+	return i.snapshots.Subscribe(afterSeq)
+}
+
 func (i *Ingestor) LastUpdated() time.Time {
 	return i.snapshots.StableSnapshot().UpdatedAt
 }
